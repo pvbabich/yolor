@@ -34,6 +34,7 @@ img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng']  # acceptable 
 vid_formats = ['mov', 'avi', 'mp4', 'mpg', 'mpeg', 'm4v', 'wmv', 'mkv']  # acceptable video suffixes
 background_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/background/*")
 hand_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/hands/*")
+hand_masks = "/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/hand_masks"
 masks_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/work_projects/data_for_seed_metrics/problem-kernels-data/yolo_dataset/train/masks/*")
 
 # Get orientation exif tag
@@ -602,18 +603,22 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             if not mosaic:
                 if random.random() < 0.2:
                     hand_path = random.choice(hand_images)
+                    hand_name = hand_path.split('/')[-1]
                     hand_image = cv2.imread(hand_path)
+                    hand_mask = cv2.imread(f"{hand_masks}/{hand_name}", 0)
                     hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
-                    hand_mask = cv2.threshold(hand_image, 237, 255, cv2.THRESH_BINARY_INV)[1]
-                    hand_mask = hand_mask[..., 0]
+                    hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
+                    hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY_INV)[1]
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[(~mask * hand_mask).astype(bool), :] = hand_image[(~mask * hand_mask).astype(bool), :]
                 elif random.random() < 0.2:
                     hand_path = random.choice(hand_images)
+                    hand_name = hand_path.split('/')[-1]
                     hand_image = cv2.imread(hand_path)
+                    hand_mask = cv2.imread(f"{hand_masks}/{hand_name}", 0)
                     hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
-                    hand_mask = cv2.threshold(hand_image, 237, 255, cv2.THRESH_BINARY_INV)[1]
-                    hand_mask = hand_mask[..., 0]
+                    hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
+                    hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY_INV)[1]
                     img[hand_mask.astype(bool), :] = hand_image[hand_mask.astype(bool), :]
                     indexes_for_delete = []
                     for ind, label in enumerate(labels):
