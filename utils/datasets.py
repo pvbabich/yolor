@@ -17,6 +17,7 @@ import torch
 from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import albumentations as A
 
 import pickle
 from copy import deepcopy
@@ -31,6 +32,9 @@ from utils.torch_utils import torch_distributed_zero_first
 help_url = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng']  # acceptable image suffixes
 vid_formats = ['mov', 'avi', 'mp4', 'mpg', 'mpeg', 'm4v', 'wmv', 'mkv']  # acceptable video suffixes
+background_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/background/*")
+hand_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/hands/*")
+masks_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/work_projects/data_for_seed_metrics/problem-kernels-data/yolo_dataset/train/masks/*")
 
 # Get orientation exif tag
 for orientation in ExifTags.TAGS.keys():
@@ -372,6 +376,11 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             sa, sb = os.sep + 'images' + os.sep, os.sep + 'labels' + os.sep  # /images/, /labels/ substrings
             return [x.replace(sa, sb, 1).replace(x.split('.')[-1], 'txt') for x in img_paths]
 
+        def img2mask_paths(img_paths):
+            # Define label paths as a function of image paths
+            sa, sb = os.sep + 'images' + os.sep, os.sep + 'masks' + os.sep  # /images/, /labels/ substrings
+            return [x.replace(sa, sb, 1) for x in img_paths]
+
         try:
             f = []  # image files
             for p in path if isinstance(path, list) else [path]:
@@ -392,6 +401,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         # Check cache
         self.label_files = img2label_paths(self.img_files)  # labels
+        self.mask_files = img2mask_paths(self.img_files)
         cache_path = str(Path(self.label_files[0]).parent) + '.cache3'  # cached labels
         if os.path.isfile(cache_path):
             cache = torch.load(cache_path)  # load
@@ -501,6 +511,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         # Cache images into memory for faster training (WARNING: large datasets may exceed system RAM)
         self.imgs = [None] * n
+        self.masks = [None] * n
         if cache_images:
             gb = 0  # Gigabytes of cached images
             self.img_hw0, self.img_hw = [None] * n, [None] * n
@@ -567,10 +578,12 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         else:
             # Load image
             img, (h0, w0), (h, w) = load_image(self, index)
+            mask, (mh0, mw0), (mh, mw) = load_mask(self, index)
 
             # Letterbox
             shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape
             img, ratio, pad = letterbox(img, shape, auto=False, scaleup=self.augment)
+            mask, _, _ = letterbox(mask, shape, auto=False, scaleup=self.augment)
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
             # Load labels
@@ -587,6 +600,27 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if self.augment:
             # Augment imagespace
             if not mosaic:
+                if random.random() < 0.2:
+                    hand_path = random.choice(hand_images)
+                    hand_image = cv2.imread(hand_path)
+                    hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
+                    hand_mask = cv2.threshold(hand_image, 237, 255, cv2.THRESH_BINARY_INV)[1]
+                    hand_mask = hand_mask[..., 0]
+                    mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
+                    img[(~mask * hand_mask).astype(bool), :] = hand_image[(~mask * hand_mask).astype(bool), :]
+                elif random.random() < 0.2:
+                    hand_path = random.choice(hand_images)
+                    hand_image = cv2.imread(hand_path)
+                    hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
+                    hand_mask = cv2.threshold(hand_image, 237, 255, cv2.THRESH_BINARY_INV)[1]
+                    hand_mask = hand_mask[..., 0]
+                    img[hand_mask.astype(bool), :] = hand_image[hand_mask.astype(bool), :]
+                    indexes_for_delete = []
+                    for ind, label in enumerate(labels):
+                        if hand_mask[int((label[1] + label[3]) / 2), int((label[0] + label[2]) / 2)]:
+                            indexes_for_delete.append(ind)
+                    labels = np.delete(labels, indexes_for_delete, 0)
+
                 img, labels = random_perspective(img, labels,
                                                  degrees=hyp['degrees'],
                                                  translate=hyp['translate'],
@@ -600,6 +634,14 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             # Apply cutouts
             # if random.random() < 0.9:
             #     labels = cutout(img, labels)
+
+            img = A.Compose([
+                A.RandomBrightnessContrast(p=0.2),
+                A.RandomGamma(p=0.4, gamma_limit=(10, 40)),
+                A.RandomSunFlare(p=0.4, src_radius=200),
+                A.RandomShadow(p=0.2, num_shadows_upper=1),
+                A.RandomToneCurve(p=0.4, scale=0.99),
+            ])(image=img)['image']
 
         nL = len(labels)  # number of labels
         if nL:
@@ -937,6 +979,19 @@ def load_image(self, index):
         return img, (h0, w0), img.shape[:2]  # img, hw_original, hw_resized
     else:
         return self.imgs[index], self.img_hw0[index], self.img_hw[index]  # img, hw_original, hw_resized
+
+
+def load_mask(self, index):
+    # loads 1 mask from masks dataset, returns img, original hw, resized hw
+    path = self.mask_files[index]
+    mask = cv2.imread(path, 0)  # BGR
+    assert mask is not None, 'Mask Not Found ' + path
+    h0, w0 = mask.shape[:2]  # orig hw
+    r = self.img_size / max(h0, w0)  # resize image to img_size
+    if r != 1:  # always resize down, only resize up if training with augmentation
+        interp = cv2.INTER_AREA if r < 1 and not self.augment else cv2.INTER_LINEAR
+        mask = cv2.resize(mask, (int(w0 * r), int(h0 * r)), interpolation=interp)
+    return mask, (h0, w0), mask.shape[:2]  # img, hw_original, hw_resized
 
 
 def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):

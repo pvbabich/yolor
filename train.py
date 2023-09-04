@@ -480,6 +480,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
 
 
 if __name__ == '__main__':
+    torch.cuda.empty_cache()
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='yolor-p6.pt', help='initial weights path')
     parser.add_argument('--cfg', type=str, default='', help='model.yaml path')

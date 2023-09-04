@@ -217,3 +217,8 @@ You will get the results:
 * [https://github.com/ultralytics/yolov5](https://github.com/ultralytics/yolov5)
 
 </details>
+
+
+cli promt to export to onnx
+`python models/export.py --weights=/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/work_projects/data_for_seed_metrics/dehusked-corn/yolor-w6-dehusked-corn-iou20/weights/best.pt --img-size=1280`
+
