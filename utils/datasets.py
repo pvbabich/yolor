@@ -32,10 +32,9 @@ from utils.torch_utils import torch_distributed_zero_first
 help_url = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng']  # acceptable image suffixes
 vid_formats = ['mov', 'avi', 'mp4', 'mpg', 'mpeg', 'm4v', 'wmv', 'mkv']  # acceptable video suffixes
-background_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/background/*")
-hand_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/hands/*")
-hand_masks = "/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/yolor/data/hand_masks"
-masks_images = glob.glob("/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/work_projects/data_for_seed_metrics/problem-kernels-data/yolo_dataset/train/masks/*")
+background_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/fruits/*")
+hand_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hands/*")
+hand_masks = "/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hand_masks"
 
 # Get orientation exif tag
 for orientation in ExifTags.TAGS.keys():
@@ -601,30 +600,60 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if self.augment:
             # Augment imagespace
             if not mosaic:
-                if random.random() < 0.2:
+                if random.random() < hyp['under_hands']:
                     hand_path = random.choice(hand_images)
                     hand_name = hand_path.split('/')[-1]
                     hand_image = cv2.imread(hand_path)
                     hand_mask = cv2.imread(f"{hand_masks}/{hand_name}", 0)
                     hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
                     hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
-                    hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY_INV)[1]
+                    hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY)[1]
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[(~mask * hand_mask).astype(bool), :] = hand_image[(~mask * hand_mask).astype(bool), :]
-                elif random.random() < 0.2:
+                    # debug
+                    # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+                    # cv2.resizeWindow("Frame", 640, 640)
+                    # cv2.imshow("Frame", img)
+                    # cv2.waitKey(0)
+                if random.random() < hyp['over_hands']:
                     hand_path = random.choice(hand_images)
                     hand_name = hand_path.split('/')[-1]
                     hand_image = cv2.imread(hand_path)
                     hand_mask = cv2.imread(f"{hand_masks}/{hand_name}", 0)
                     hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
                     hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
-                    hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY_INV)[1]
+                    hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[hand_mask.astype(bool), :] = hand_image[hand_mask.astype(bool), :]
                     indexes_for_delete = []
                     for ind, label in enumerate(labels):
-                        if hand_mask[int((label[1] + label[3]) / 2), int((label[0] + label[2]) / 2)]:
+                        center = hand_mask[int((label[2] + label[4]) / 2), int((label[1] + label[3]) / 2)]
+                        # p1 = hand_mask[int(label[2]), int(label[1])]
+                        # p2 = hand_mask[int(label[2]), int(label[3])]
+                        # p3 = hand_mask[int(label[4]), int(label[1])]
+                        # p4 = hand_mask[int(label[4]), int(label[3])]
+                        # print(center, p1, p2, p3, p4)
+                        if center:
                             indexes_for_delete.append(ind)
                     labels = np.delete(labels, indexes_for_delete, 0)
+                    # # debug
+                    # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+                    # cv2.resizeWindow("Frame", 640, 640)
+                    # for ind, label in enumerate(labels):
+                    #     print(label)
+                    #     img = cv2.rectangle(img, (int(label[1]), int(label[2])), (int(label[3]), int(label[4])), (255, 0, 0), 2)
+                    # cv2.imshow("Frame", img)
+                    # cv2.waitKey(0)
+                if random.random() < hyp['background']:
+                    back_path = random.choice(background_images)
+                    back_image = cv2.imread(back_path)
+                    back_image = cv2.resize(back_image, (img.shape[1], img.shape[0]))
+                    mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
+                    img[(~mask).astype(bool), :] = back_image[(~mask).astype(bool), :]
+                    # debug
+                    # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+                    # cv2.resizeWindow("Frame", 640, 640)
+                    # cv2.imshow("Frame", img)
+                    # cv2.waitKey(0)
 
                 img, labels = random_perspective(img, labels,
                                                  degrees=hyp['degrees'],
