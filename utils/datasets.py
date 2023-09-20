@@ -681,11 +681,11 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             #     labels = cutout(img, labels)
 
             img = A.Compose([
-                A.RandomBrightnessContrast(p=0.2),
-                A.RandomGamma(p=0.4, gamma_limit=(10, 40)),
-                A.RandomSunFlare(p=0.4, src_radius=200),
+                A.RandomBrightnessContrast(p=0.1),
+                A.RandomGamma(p=0.2, gamma_limit=(10, 40)),
+                A.RandomSunFlare(p=0.2, src_radius=200),
                 A.RandomShadow(p=0.2, num_shadows_upper=1),
-                A.RandomToneCurve(p=0.4, scale=0.99),
+                A.RandomToneCurve(p=0.1, scale=0.95),
             ])(image=img)['image']
 
         nL = len(labels)  # number of labels
