@@ -32,9 +32,9 @@ from utils.torch_utils import torch_distributed_zero_first
 help_url = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng']  # acceptable image suffixes
 vid_formats = ['mov', 'avi', 'mp4', 'mpg', 'mpeg', 'm4v', 'wmv', 'mkv']  # acceptable video suffixes
-background_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/fruits/*")
-hand_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hands/*")
-hand_masks = "/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hand_masks"
+# background_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/fruits/*")
+# hand_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hands/*")
+# hand_masks = "/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hand_masks"
 
 # Get orientation exif tag
 for orientation in ExifTags.TAGS.keys():
@@ -63,7 +63,8 @@ def exif_size(img):
 
 
 def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=False, cache=False, pad=0.0, rect=False,
-                      rank=-1, world_size=1, workers=8):
+                      rank=-1, world_size=1, workers=8, background_images=None,
+                      hand_images=None, hand_masks=None):
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     with torch_distributed_zero_first(rank):
         dataset = LoadImagesAndLabels(path, imgsz, batch_size,
@@ -74,7 +75,10 @@ def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=Fa
                                       single_cls=opt.single_cls,
                                       stride=int(stride),
                                       pad=pad,
-                                      rank=rank)
+                                      rank=rank,
+                                      background_images=background_images,
+                                      hand_images=hand_images,
+                                      hand_masks=hand_masks)
 
     batch_size = min(batch_size, len(dataset))
     nw = min([os.cpu_count() // world_size, batch_size if batch_size > 1 else 0, workers])  # number of workers
@@ -361,7 +365,8 @@ class LoadStreams:  # multiple IP or RTSP cameras
 
 class LoadImagesAndLabels(Dataset):  # for training/testing
     def __init__(self, path, img_size=640, batch_size=16, augment=False, hyp=None, rect=False, image_weights=False,
-                 cache_images=False, single_cls=False, stride=32, pad=0.0, rank=-1):
+                 cache_images=False, single_cls=False, stride=32, pad=0.0, rank=-1, background_images=None,
+                 hand_images=None, hand_masks=None):
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -370,6 +375,12 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.mosaic = self.augment and not self.rect  # load 4 images at a time into a mosaic (only during training)
         self.mosaic_border = [-img_size // 2, -img_size // 2]
         self.stride = stride
+        if background_images is not None:
+            self.background_images = glob.glob(f"{background_images}/*")
+        if hand_images is not None:
+            self.hand_images = glob.glob(f"{hand_images}/*")
+        if hand_masks is not None:
+            self.hand_masks = hand_masks
 
         def img2label_paths(img_paths):
             # Define label paths as a function of image paths
@@ -601,10 +612,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             # Augment imagespace
             if not mosaic:
                 if random.random() < hyp['under_hands']:
-                    hand_path = random.choice(hand_images)
+                    hand_path = random.choice(self.hand_images)
                     hand_name = hand_path.split('/')[-1]
                     hand_image = cv2.imread(hand_path)
-                    hand_mask = cv2.imread(f"{hand_masks}/{hand_name}", 0)
+                    hand_mask = cv2.imread(f"{self.hand_masks}/{hand_name}", 0)
                     hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
                     hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
                     hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY)[1]
@@ -616,10 +627,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     # cv2.imshow("Frame", img)
                     # cv2.waitKey(0)
                 if random.random() < hyp['over_hands']:
-                    hand_path = random.choice(hand_images)
+                    hand_path = random.choice(self.hand_images)
                     hand_name = hand_path.split('/')[-1]
                     hand_image = cv2.imread(hand_path)
-                    hand_mask = cv2.imread(f"{hand_masks}/{hand_name}", 0)
+                    hand_mask = cv2.imread(f"{self.hand_masks}/{hand_name}", 0)
                     hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
                     hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
                     hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY)[1]
@@ -644,7 +655,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     # cv2.imshow("Frame", img)
                     # cv2.waitKey(0)
                 if random.random() < hyp['background']:
-                    back_path = random.choice(background_images)
+                    back_path = random.choice(self.background_images)
                     back_image = cv2.imread(back_path)
                     back_image = cv2.resize(back_image, (img.shape[1], img.shape[0]))
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
