@@ -622,10 +622,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[(~mask * hand_mask).astype(bool), :] = hand_image[(~mask * hand_mask).astype(bool), :]
                     # debug
-                    # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-                    # cv2.resizeWindow("Frame", 640, 640)
-                    # cv2.imshow("Frame", img)
-                    # cv2.waitKey(0)
+                    cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+                    cv2.resizeWindow("Frame", 640, 640)
+                    cv2.imshow("Frame", img)
+                    cv2.waitKey(0)
                 if random.random() < hyp['over_hands']:
                     hand_path = random.choice(self.hand_images)
                     hand_name = hand_path.split('/')[-1]
@@ -647,13 +647,13 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                             indexes_for_delete.append(ind)
                     labels = np.delete(labels, indexes_for_delete, 0)
                     # # debug
-                    # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-                    # cv2.resizeWindow("Frame", 640, 640)
-                    # for ind, label in enumerate(labels):
-                    #     print(label)
-                    #     img = cv2.rectangle(img, (int(label[1]), int(label[2])), (int(label[3]), int(label[4])), (255, 0, 0), 2)
-                    # cv2.imshow("Frame", img)
-                    # cv2.waitKey(0)
+                    cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+                    cv2.resizeWindow("Frame", 640, 640)
+                    for ind, label in enumerate(labels):
+                        print(label)
+                        img = cv2.rectangle(img, (int(label[1]), int(label[2])), (int(label[3]), int(label[4])), (255, 0, 0), 2)
+                    cv2.imshow("Frame", img)
+                    cv2.waitKey(0)
                 if random.random() < hyp['background']:
                     back_path = random.choice(self.background_images)
                     back_image = cv2.imread(back_path)
@@ -661,10 +661,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[(~mask).astype(bool), :] = back_image[(~mask).astype(bool), :]
                     # debug
-                    # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-                    # cv2.resizeWindow("Frame", 640, 640)
-                    # cv2.imshow("Frame", img)
-                    # cv2.waitKey(0)
+                    cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+                    cv2.resizeWindow("Frame", 640, 640)
+                    cv2.imshow("Frame", img)
+                    cv2.waitKey(0)
 
                 img, labels = random_perspective(img, labels,
                                                  degrees=hyp['degrees'],

@@ -222,7 +222,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
     # Process 0
     if rank in [-1, 0]:
         ema.updates = start_epoch * nb // accumulate  # set EMA updates
-        testloader = create_dataloader(test_path, imgsz_test, batch_size*2, gs, opt,
+        testloader = create_dataloader(test_path, imgsz_test, batch_size, gs, opt,
                                        hyp=hyp, cache=opt.cache_images and not opt.notest, rect=True,
                                        rank=-1, world_size=opt.world_size, workers=opt.workers,
                                        background_images=background_images, hand_images=hand_images,
@@ -367,7 +367,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
             if not opt.notest or final_epoch:  # Calculate mAP
                 if epoch >= 3:
                     results, maps, times = test.test(opt.data,
-                                                 batch_size=batch_size*2,
+                                                 batch_size=batch_size,
                                                  imgsz=imgsz_test,
                                                  model=ema.ema,
                                                  single_cls=opt.single_cls,
