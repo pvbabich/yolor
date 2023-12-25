@@ -32,9 +32,9 @@ from utils.torch_utils import torch_distributed_zero_first
 help_url = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng']  # acceptable image suffixes
 vid_formats = ['mov', 'avi', 'mp4', 'mpg', 'mpeg', 'm4v', 'wmv', 'mkv']  # acceptable video suffixes
-# background_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/fruits/*")
-# hand_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hands/*")
-# hand_masks = "/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/hand_masks"
+# background_images = glob.glob("/home/pvb/Projects/seed_metrics/data/prepared/kernel_datasets/table_images/*")
+# hand_images = glob.glob("/home/pvb/Projects/seed_metrics/data/raw_data/drive-download-20231027T053729Z-001/coco_object/images/*")
+# hand_masks = "/home/pvb/Projects/seed_metrics/data/raw_data/drive-download-20231027T053729Z-001/coco_object/masks"
 
 # Get orientation exif tag
 for orientation in ExifTags.TAGS.keys():
@@ -614,14 +614,23 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 if random.random() < hyp['under_hands']:
                     hand_path = random.choice(self.hand_images)
                     hand_name = hand_path.split('/')[-1]
+
                     hand_image = cv2.imread(hand_path)
-                    hand_mask = cv2.imread(f"{self.hand_masks}/{hand_name}", 0)
-                    hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
-                    hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
+                    hand_mask = cv2.imread(f"{self.hand_masks}/{hand_name[:-5]}.png", 0)
+
+                    hand_image = cv2.resize(hand_image, (img.shape[1]//2, img.shape[0]//2))
+                    hand_mask = cv2.resize(hand_mask, (img.shape[1]//2, img.shape[0]//2))
+
+                    start_x, start_y = random.randint(0, img.shape[1]//2), random.randint(0, img.shape[0]//2)
+                    hand_image = cv2.copyMakeBorder(hand_image, start_y, img.shape[0]//2-start_y, start_x,
+                                                    img.shape[1]//2-start_x, cv2.BORDER_CONSTANT, None, value=0)
+                    hand_mask = cv2.copyMakeBorder(hand_mask, start_y, img.shape[0]//2 - start_y, start_x,
+                                                   img.shape[1]//2 - start_x, cv2.BORDER_CONSTANT, None, value=0)
+
                     hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY)[1]
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[(~mask * hand_mask).astype(bool), :] = hand_image[(~mask * hand_mask).astype(bool), :]
-                    # debug
+                    # # debug
                     # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
                     # cv2.resizeWindow("Frame", 640, 640)
                     # cv2.imshow("Frame", img)
@@ -629,12 +638,22 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 if random.random() < hyp['over_hands']:
                     hand_path = random.choice(self.hand_images)
                     hand_name = hand_path.split('/')[-1]
+
                     hand_image = cv2.imread(hand_path)
-                    hand_mask = cv2.imread(f"{self.hand_masks}/{hand_name}", 0)
-                    hand_image = cv2.resize(hand_image, (img.shape[1], img.shape[0]))
-                    hand_mask = cv2.resize(hand_mask, (img.shape[1], img.shape[0]))
+                    hand_mask = cv2.imread(f"{self.hand_masks}/{hand_name[:-5]}.png", 0)
+
+                    hand_image = cv2.resize(hand_image, (img.shape[1] // 2, img.shape[0] // 2))
+                    hand_mask = cv2.resize(hand_mask, (img.shape[1] // 2, img.shape[0] // 2))
+
+                    start_x, start_y = random.randint(0, img.shape[1] // 2), random.randint(0, img.shape[0] // 2)
+                    hand_image = cv2.copyMakeBorder(hand_image, start_y, img.shape[0] // 2 - start_y, start_x,
+                                                    img.shape[1] // 2 - start_x, cv2.BORDER_CONSTANT, None, value=0)
+                    hand_mask = cv2.copyMakeBorder(hand_mask, start_y, img.shape[0] // 2 - start_y, start_x,
+                                                   img.shape[1] // 2 - start_x, cv2.BORDER_CONSTANT, None, value=0)
+
                     hand_mask = cv2.threshold(hand_mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[hand_mask.astype(bool), :] = hand_image[hand_mask.astype(bool), :]
+
                     indexes_for_delete = []
                     for ind, label in enumerate(labels):
                         center = hand_mask[int((label[2] + label[4]) / 2), int((label[1] + label[3]) / 2)]

@@ -79,5 +79,5 @@ python detect.py --source images/horses.jpg --weights yolor-p6.pt --conf 0.25 --
 
 ## Export to onnx
 ```commandline
-python models/export.py --weights=/media/pvb/20127138-1a35-451b-85c0-a84dbc12ae79/storage/work_projects/data_for_seed_metrics/dehusked-corn/yolor-w6-dehusked-corn-iou20/weights/best.pt --img-size=1280
+python models/export.py --weights=/path/to/your/weights.pt --img-size=1280
 ```
