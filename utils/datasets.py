@@ -430,7 +430,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.label_files = img2label_paths(cache.keys())  # update
 
         n = len(shapes)  # number of images
-        bi = np.floor(np.arange(n) / batch_size).astype(np.int)  # batch index
+        bi = np.floor(np.arange(n) / batch_size).astype(int)  # batch index
         nb = bi[-1] + 1  # number of batches
         self.batch = bi  # batch index of image
         self.n = n
@@ -457,7 +457,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 elif mini > 1:
                     shapes[i] = [1, 1 / mini]
 
-            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(np.int) * stride
+            self.batch_shapes = np.ceil(np.array(shapes) * img_size / stride + pad).astype(int) * stride
 
         # Check labels
         create_datasubset, extract_bounding_boxes, labels_loaded = False, False, False
@@ -656,20 +656,22 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
                     indexes_for_delete = []
                     for ind, label in enumerate(labels):
-                        center = hand_mask[int((label[2] + label[4]) / 2), int((label[1] + label[3]) / 2)]
-                        # p1 = hand_mask[int(label[2]), int(label[1])]
-                        # p2 = hand_mask[int(label[2]), int(label[3])]
-                        # p3 = hand_mask[int(label[4]), int(label[1])]
-                        # p4 = hand_mask[int(label[4]), int(label[3])]
-                        # print(center, p1, p2, p3, p4)
-                        if center:
+                        # center = hand_mask[
+                        #     min(h-1, int((label[2] + label[4]) / 2)),
+                        #     min(w-1, int((label[1] + label[3]) / 2))
+                        # ]
+                        p1 = hand_mask[min(1279, int(label[2])), min(1279, int(label[1]))]
+                        p2 = hand_mask[min(1279, int(label[2])), min(1279, int(label[3]))]
+                        p3 = hand_mask[min(1279, int(label[4])), min(1279, int(label[1]))]
+                        p4 = hand_mask[min(1279, int(label[4])), min(1279, int(label[3]))]
+                        if int(p1) + int(p2) + int(p3) + int(p4) > 2:
                             indexes_for_delete.append(ind)
                     labels = np.delete(labels, indexes_for_delete, 0)
                     # # debug
                     # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
                     # cv2.resizeWindow("Frame", 640, 640)
                     # for ind, label in enumerate(labels):
-                    #     print(label)
+                    #     # print(label)
                     #     img = cv2.rectangle(img, (int(label[1]), int(label[2])), (int(label[3]), int(label[4])), (255, 0, 0), 2)
                     # cv2.imshow("Frame", img)
                     # cv2.waitKey(0)
@@ -679,7 +681,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     back_image = cv2.resize(back_image, (img.shape[1], img.shape[0]))
                     mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)[1]
                     img[(~mask).astype(bool), :] = back_image[(~mask).astype(bool), :]
-                    # debug
+                    # # debug
                     # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
                     # cv2.resizeWindow("Frame", 640, 640)
                     # cv2.imshow("Frame", img)
@@ -729,6 +731,12 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         labels_out = torch.zeros((nL, 6))
         if nL:
             labels_out[:, 1:] = torch.from_numpy(labels)
+
+        # # debug
+        # cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+        # cv2.resizeWindow("Frame", 640, 640)
+        # cv2.imshow("Frame", img)
+        # cv2.waitKey(0)
 
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
