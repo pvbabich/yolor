@@ -2,13 +2,14 @@
 
 # base ----------------------------------------
 Cython
-matplotlib>=3.2.2
+matplotlib==3.4
 numpy==1.22.4
 opencv-python>=4.1.2
 Pillow
 PyYAML>=5.3.1
 scipy>=1.4.1
-tensorboard>=1.5
+tensorboard
+albumentations==1.0
 tqdm>=4.41.0
 
 # logging -------------------------------------
